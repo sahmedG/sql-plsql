@@ -1,0 +1,50 @@
+declare
+barriers varchar2(300);
+ l_array     wwv_flow_global.vc_arr2;
+ v_array varchar(3000);
+begin
+      l_array := apex_util.STRING_TO_TABLE(:barrier ,':');                                                      
+      for i in l_array.first..l_array.last  
+      loop    
+              select INTERVENTION_DESCTIPTION into v_array from PFE_INTERVENTION_ITEM where INTERVENTION_NAME = l_array(i);
+         end loop; 
+ DBMS_OUTPUT.PUT_LINE (v_array);
+end;
+/
+SELECT PERSON.TITLE,
+  PERSON.FULL_NAME,
+  PERSON.CPR_NUMBER,
+  PERSON.GENDER,
+  TO_CHAR(PERSON.DOB, 'DD-MON-YYYY') AS DOB,
+  CALCULATE_AGE(PERSON.DOB)          AS age,
+  VISIT.VISIT_ID,
+  PERSON.FULL_NAME_LOCAL,
+  PERSON.NATIONALITY
+  || ' - '
+  ||
+  (SELECT country.NATIONALITY_ENGLISH
+  FROM country
+  WHERE country.COUNTRY_CODE_BH = PERSON.NATIONALITY
+  )                                                                                          AS NATIONALITY,
+  PERSON.ADDR_BLOCK                                                                          AS "BLOCK",
+  (Select block_area.area_name from block_area where block_area.block = PERSON.ADDR_BLOCK) AS AREA_NAME,
+  PERSON.CONTACT_LAND_LINE,
+  PERSON.CONTACT_CELL_2,
+  PERSON.CONTACT_CELL_1,
+  WITHIN_CATCHMENT_AREA(PERSON.ADDR_BLOCK) AS is_catchment,
+  PERSON.NATIONALITY                       AS patient_nationality,
+  VISIT_TYPE.VISIT_TYPE_CODE,
+  SPECIALTY.SPECIALTY_NAME,
+  SPECIALTY.ACRONYM,
+  TO_CHAR(VISIT.STARTED_ON, 'YY-MON-DD HH24:MI')   AS visti_start,
+  TO_CHAR(VISIT.COMPLETED_ON, 'YY-MON-DD HH24:MI') AS visit_end
+FROM PERSON
+INNER JOIN VISIT
+ON PERSON.PERSON_ID = VISIT.PATIENT
+INNER JOIN PROVIDER_ORDER
+ON VISIT.VISIT_ID = PROVIDER_ORDER.VISIT
+INNER JOIN VISIT_TYPE
+ON VISIT.VISIT_TYPE = VISIT_TYPE.VISIT_TYPE_ID
+INNER JOIN SPECIALTY
+ON VISIT.PRIMARY_SPECIALTY             = SPECIALTY.SPECIALTY_ID
+where provider_order.provider_order_id = 46354;

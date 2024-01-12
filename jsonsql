@@ -1,0 +1,21 @@
+select '{"telecom": {[' 
+       || listagg( '{ '
+       ||' "system":"'||'phone'||'"'
+       ||',"value":'||phone||'"'
+       ||',"use":'||'home'
+       ||'} ', ',') within group (order by 1) 
+       || ']} }'as  json
+  from   person where person_id = 891210601;
+  select '"name": [' 
+       || listagg( '{ '
+       ||' "family":"'||person_name||'"'
+       ||',"given":'||person_name
+       ||'} ', ',') within group (order by 1) 
+       || ']} 'as  json
+  from   person where person_id = 891210601;
+  select '{"gender": {[' 
+       || listagg( '{ '
+       ||' "gender":"'||sex
+       ||'} ', ',') within group (order by 1) 
+       || ']} }'as  json
+  from   person where person_id = 891210601;

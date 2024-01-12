@@ -1,0 +1,37 @@
+select * from icuprod.person@ccis where person_first_name like 'kamel';
+select * from icuprod.encounter@ccis;
+select * from icuprod.medical_note@ccis;
+select * from icuprod.person@ccis where person_cpr = 500008582;
+select * from icuprod.medical_note_type@ccis;
+describe icuprod.medical_note@ccis;
+describe icuprod.medical_note_type@ccis;
+select * from visit_type;
+select * from visit_status;
+ select count(medical_note_text) from icuprod.medical_note@ccis where encounter = 570;
+select patient , visit_id from visit 
+where patient in (61000302,590132490,670330752,320001385,580107388,390023124,560209991,450102068,500008582,340103833,600331660,560162170)
+and visit_type = 2
+and visit_status = 2;
+select  medical_note.create_date ,medical_note_type.type_name
+,person.person_cpr,a.person_cpr,(medical_note.medical_note_text)
+from  icuprod.medical_note@ccis 
+join  icuprod.encounter@ccis on encounter = encounter_id
+join  icuprod.person@ccis a on person = a.person_id
+join  icuprod.person@ccis on medical_note.create_person = person.person_id
+join  icuprod.medical_note_type@ccis on medical_note_type = type_id
+where a.person_cpr = 600331660;
+
+
+select  medical_note.create_date,medical_note_type.type_name as "note type"
+,a.person_cpr as "patient",b.person_cpr as "user",b.person_full_name as "username",(medical_note.medical_note_text)
+from    icuprod.medical_note@ccis ,  icuprod.encounter@ccis ,icuprod.person@ccis a,icuprod.medical_note_type@ccis ,icuprod.person@ccis b
+where  medical_note.encounter = encounter.encounter_id
+and    encounter.person = a.person_id
+and    medical_note.create_person = b.person_id
+and    medical_note.medical_note_type = medical_note_type.type_id
+and    (a.hope_visit_last = 106752 or a.alcare_visit_last = 106752) order by create_date;
+
+
+select to_char(updated_on , 'DD-mm-YY') from bed_occupancy where occupant = 600331660;
+
+select sysdate from dual;

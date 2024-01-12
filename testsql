@@ -1,0 +1,223 @@
+
+FOR c1 IN (SELECT person , sal FROM person WHERE person = 891210601)
+LOOP
+htp.p('<BR> EMPLOYEE NAME :' || c1.person || '<br> employee sal :' || c1.age);
+END LOOP;
+commit;
+
+
+select * from table (pivot('select observation_id,max(weight ||height) count_weight from observation2 group by observation_id'));
+
+
+select * from
+(
+  select created_on,height,weight,bmi,bsa,temp,observation_id
+  from OBSERVATION2
+)
+PIVOT 
+(
+  LISTAGG(created_on) 
+  WITHIN GROUP (ORDER BY observation_id) 
+  FOR observation_id IN ('20', '27','32','33','36')
+)
+unpivot
+(
+  value 
+  for observation_id in (height ,bsa,bmi,temp,weight)
+);
+
+
+
+
+select * from
+(
+  select height,weight,bmi,bsa,observation_id
+  from OBSERVATION2
+)
+PIVOT 
+( 
+  listagg (value for height in (height,wight,bmi,bsa))
+  within group (order by observation_id)
+  FOR observation_id IN ('33')
+);
+
+commit;
+
+
+
+
+
+
+
+declare
+  l_sql_string varchar2(2000);
+  
+  l_json       xmltype;
+begin
+  l_sql_string := 'select * from appointment2';
+
+  l_json := itstar_xml_util.xml2json(l_sql_string);
+
+  dbms_output.put_line(l_json.getclobval());  
+end;
+
+
+
+create or replace function get_dept_apex_json(
+   p_dept_id in departments.department_id%type
+)
+ 
+   return clob
+   
+is
+      
+   cursor manager_cur (
+      p_manager_id in employees.employee_id%type
+   )
+   is
+      select *
+      from employees
+      where employee_id = manager_cur.p_manager_id;
+ 
+   l_date_format    constant varchar2(20) := 'DD-MON-YYYY';
+   l_dept_rec       departments%rowtype;
+   l_dept_json_clob clob;
+   l_loc_rec        locations%rowtype;
+   l_country_rec    countries%rowtype;
+   l_manager_rec    manager_cur%rowtype;
+   l_job_rec        jobs%rowtype;
+ 
+begin
+ 
+   apex_json.initialize_clob_output;
+ 
+   select *
+   into l_dept_rec
+   from departments
+   where department_id = get_dept_apex_json.p_dept_id;
+   
+   apex_json.open_object(); --department
+   
+   apex_json.write('id', l_dept_rec.department_id);
+   apex_json.write('name', l_dept_rec.department_name);
+   
+   select *
+   into l_loc_rec
+   from locations
+   where location_id = l_dept_rec.location_id;
+ 
+   apex_json.open_object('location');
+ 
+   apex_json.write('id', l_loc_rec.location_id);
+   apex_json.write('streetAddress', l_loc_rec.street_address);
+   apex_json.write('postalCode', l_loc_rec.postal_code);
+   
+   select *
+   into l_country_rec
+   from countries cou
+   where cou.country_id = l_loc_rec.country_id;
+   
+   apex_json.open_object('country');
+    
+   apex_json.write('id', l_country_rec.country_id);
+   apex_json.write('name', l_country_rec.country_name);
+   apex_json.write('regionId', l_country_rec.region_id);
+   
+   apex_json.close_object(); --country
+   
+   apex_json.close_object(); --location
+      
+   open manager_cur(l_dept_rec.manager_id);
+   fetch manager_cur into l_manager_rec;
+ 
+   if manager_cur%found
+   then
+      apex_json.open_object('manager');
+      
+      apex_json.write('id', l_manager_rec.employee_id);
+      apex_json.write('name', l_manager_rec.first_name || ' ' || l_manager_rec.last_name);
+      apex_json.write('salary', l_manager_rec.salary);
+      
+      select *
+      into l_job_rec
+      from jobs job
+      where job.job_id = l_manager_rec.job_id;
+      
+      apex_json.open_object('job');
+      
+      apex_json.write('id', l_job_rec.job_id);
+      apex_json.write('title', l_job_rec.job_title);
+      apex_json.write('minSalary', l_job_rec.min_salary);
+      apex_json.write('maxSalary', l_job_rec.max_salary);
+      
+      apex_json.close_object(); --job
+      
+      apex_json.close_object(); --manager
+   else
+      apex_json.write('manager', '', p_write_null => true);
+   end if;
+   
+   close manager_cur;
+   
+   apex_json.open_array('employees');
+   
+   for emp_rec in (
+      select *
+      from employees
+      where department_id = l_dept_rec.department_id
+   )
+   loop
+      apex_json.open_object(); --employee
+      
+      apex_json.write('id', emp_rec.employee_id);
+      apex_json.write('name', emp_rec.first_name || ' ' || emp_rec.last_name);
+      apex_json.write('isSenior', emp_rec.hire_date < to_date('01-jan-2005', 'dd-mon-yyyy'));
+      apex_json.write('commissionPct', emp_rec.commission_pct, p_write_null => true);
+      
+      apex_json.open_array('jobHistory');
+      
+      for jh_rec in (
+         select job_id,
+            department_id,
+            start_date,
+            end_date
+         from job_history
+         where employee_id = emp_rec.employee_id
+      )
+      loop
+          apex_json.open_object(); --job
+          
+          apex_json.write('id', jh_rec.job_id);
+          apex_json.write('departmentId', jh_rec.department_id);
+          apex_json.write('startDate', to_char(jh_rec.start_date, l_date_format));
+          apex_json.write('endDate', to_char(jh_rec.end_date, l_date_format));
+          
+          apex_json.close_object(); --job
+      end loop;
+      
+      apex_json.close_array(); --jobHistory
+      
+      apex_json.close_object(); --employee
+   end loop;
+   
+   apex_json.close_array(); --employees
+   apex_json.close_object(); --department
+   
+   l_dept_json_clob := apex_json.get_clob_output;
+   
+   apex_json.free_output;
+   
+   return l_dept_json_clob;
+   
+exception
+ 
+   when others
+   then      
+      if manager_cur%isopen
+      then
+         close manager_cur;
+      end if;
+      
+      raise;
+ 
+end get_dept_apex_json;
